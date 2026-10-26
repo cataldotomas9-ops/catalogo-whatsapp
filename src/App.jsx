@@ -12,10 +12,10 @@ function leerCarrito() {
   }
 }
 
+const plata = (n) => `${negocio.moneda}${n.toLocaleString('es-AR')}`
+
 export default function App() {
   const [carrito, setCarrito] = useState(leerCarrito)
-  const [categoria, setCategoria] = useState('Todas')
-  const [busqueda, setBusqueda] = useState('')
   const [nota, setNota] = useState('')
   const [abierto, setAbierto] = useState(false)
 
@@ -27,71 +27,97 @@ export default function App() {
     }
   }, [carrito])
 
-  const categorias = useMemo(() => ['Todas', ...new Set(productos.map((p) => p.categoria))], [])
-  const visibles = productos.filter(
-    (p) =>
-      (categoria === 'Todas' || p.categoria === categoria) &&
-      p.nombre.toLowerCase().includes(busqueda.trim().toLowerCase()),
-  )
+  const categorias = useMemo(() => [...new Set(productos.map((p) => p.categoria))], [])
   const items = cantidadTotal(carrito)
   const importe = total(carrito, productos)
   const enlace = linkWhatsapp(negocio.whatsapp, mensaje(carrito, productos, negocio, nota))
 
   return (
     <>
-      <header className="cabecera">
-        <div>
-          <h1>{negocio.nombre}</h1>
-          <p>{negocio.slogan}</p>
-        </div>
-        <button className="boton-carrito" onClick={() => setAbierto(true)} aria-label="Abrir carrito">
-          🛒 <span>{items}</span>
+      <header className="barra">
+        <a className="marca" href="#arriba">
+          {negocio.nombre}
+        </a>
+        <button className="pedido" onClick={() => setAbierto(true)}>
+          Mi pedido{items > 0 && <span className="cuenta">{items}</span>}
         </button>
       </header>
 
-      <main className="contenedor">
-        <input
-          className="buscador"
-          type="search"
-          placeholder="Buscar producto..."
-          value={busqueda}
-          onChange={(e) => setBusqueda(e.target.value)}
-        />
-        <nav className="filtros">
+      <main id="arriba" className="pagina">
+        <section className="presentacion">
+          <p className="tipo">{negocio.tipo}</p>
+          <h1>Pan y facturas del día</h1>
+          <p>{negocio.historia}</p>
+          <p className="horarios">
+            {negocio.direccion} · {negocio.horarios}
+          </p>
+        </section>
+
+        <nav className="indice" aria-label="Categorías">
           {categorias.map((c) => (
-            <button key={c} className={c === categoria ? 'activo' : ''} onClick={() => setCategoria(c)}>
+            <a key={c} href={`#${c}`}>
               {c}
-            </button>
+            </a>
           ))}
         </nav>
 
-        <section className="grilla">
-          {visibles.map((p) => (
-            <article key={p.id} className="tarjeta">
-              <div className="emoji">{p.emoji}</div>
-              <h2>{p.nombre}</h2>
-              <p className="precio">
-                {negocio.moneda}
-                {p.precio}
-              </p>
-              <button onClick={() => setCarrito((c) => agregar(c, p.id))}>Agregar</button>
-            </article>
-          ))}
-          {visibles.length === 0 && <p className="vacio">No hay productos que coincidan.</p>}
-        </section>
+        {categorias.map((c) => (
+          <section key={c} id={c} className="seccion">
+            <h2>{c}</h2>
+            <ul className="menu">
+              {productos
+                .filter((p) => p.categoria === c)
+                .map((p) => (
+                  <li key={p.id}>
+                    <div className="texto">
+                      <span className="nombre">{p.nombre}</span>
+                      <span className="detalle">{p.detalle}</span>
+                    </div>
+                    <span className="precio">{plata(p.precio)}</span>
+                    {carrito[p.id] ? (
+                      <span className="cantidad">
+                        <button onClick={() => setCarrito((x) => quitar(x, p.id))} aria-label={`Quitar ${p.nombre}`}>
+                          −
+                        </button>
+                        <b>{carrito[p.id]}</b>
+                        <button onClick={() => setCarrito((x) => agregar(x, p.id))} aria-label={`Agregar ${p.nombre}`}>
+                          +
+                        </button>
+                      </span>
+                    ) : (
+                      <button className="agregar" onClick={() => setCarrito((x) => agregar(x, p.id))}>
+                        Agregar
+                      </button>
+                    )}
+                  </li>
+                ))}
+            </ul>
+          </section>
+        ))}
+
+        <footer className="pie">
+          <p>
+            {negocio.nombre} · {negocio.direccion}
+          </p>
+          <p>Sitio de ejemplo hecho por Tomás Cataldo.</p>
+        </footer>
       </main>
 
+      {items > 0 && !abierto && (
+        <button className="barra-pedido" onClick={() => setAbierto(true)}>
+          Ver mi pedido · {items} {items === 1 ? 'producto' : 'productos'} · {plata(importe)}
+        </button>
+      )}
+
       {abierto && <div className="fondo" onClick={() => setAbierto(false)} />}
-      <aside className={`panel ${abierto ? 'abierto' : ''}`}>
+      <aside className={`panel ${abierto ? 'abierto' : ''}`} aria-hidden={!abierto}>
         <div className="panel-cabecera">
-          <h2>Tu pedido</h2>
-          <button onClick={() => setAbierto(false)} aria-label="Cerrar carrito">
-            ✕
-          </button>
+          <h2>Mi pedido</h2>
+          <button onClick={() => setAbierto(false)}>Cerrar</button>
         </div>
 
         {items === 0 ? (
-          <p className="vacio">Todavía no agregaste nada.</p>
+          <p className="vacio">Todavía no elegiste nada.</p>
         ) : (
           <>
             <ul className="lista">
@@ -100,34 +126,29 @@ export default function App() {
                 .map((p) => (
                   <li key={p.id}>
                     <span>
-                      {p.emoji} {p.nombre}
+                      {carrito[p.id]} × {p.nombre}
                     </span>
-                    <span className="cantidad">
-                      <button onClick={() => setCarrito((c) => quitar(c, p.id))}>−</button>
-                      {carrito[p.id]}
-                      <button onClick={() => setCarrito((c) => agregar(c, p.id))}>+</button>
-                    </span>
-                    <strong>
-                      {negocio.moneda}
-                      {p.precio * carrito[p.id]}
-                    </strong>
+                    <strong>{plata(p.precio * carrito[p.id])}</strong>
                   </li>
                 ))}
             </ul>
-            <textarea
-              placeholder="Nota para el negocio (opcional)"
-              value={nota}
-              onChange={(e) => setNota(e.target.value)}
-            />
+            <label className="campo">
+              ¿Algo que quieras aclarar?
+              <textarea
+                placeholder="Ej.: la torta para las 18"
+                value={nota}
+                onChange={(e) => setNota(e.target.value)}
+              />
+            </label>
             <p className="total">
-              Total: {negocio.moneda}
-              {importe}
+              <span>Total</span>
+              <strong>{plata(importe)}</strong>
             </p>
             <a className="enviar" href={enlace} target="_blank" rel="noreferrer">
-              Enviar pedido por WhatsApp
+              Mandar el pedido por WhatsApp
             </a>
             <button className="vaciar" onClick={() => setCarrito({})}>
-              Vaciar carrito
+              Empezar de nuevo
             </button>
           </>
         )}
